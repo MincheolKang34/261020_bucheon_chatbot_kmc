@@ -52,7 +52,8 @@ def build_messages(cid, conv, user_msg):
     if summary:
         messages.append({
             "role": "system",
-            "content": "다음은 이 사용자와 나눈 이전 대화의 요약입니다. 맥락으로 활용하세요.\n" + summary,
+            "content": "다음은 이 사용자와 나눈 이전 대화의 요약입니다. 맥락으로 활용하되, "
+                       "요약이나 이전 답변이 영어여도 답변은 한국어로 하세요.\n" + summary,
         })
     messages += [{"role": m["role"], "content": m["content"]} for m in history[done:]]
     messages.append(user_msg)

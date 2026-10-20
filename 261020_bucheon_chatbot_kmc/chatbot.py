@@ -10,8 +10,15 @@ import requests
 from dotenv import load_dotenv, set_key
 from groq import AuthenticationError, Groq, GroqError, PermissionDeniedError
 
+from safety import CRISIS_REPLY, is_crisis
+
 ENV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
-SYSTEM_PROMPT = "당신은 친절한 한국어 챗봇입니다. 간결하고 정확하게 답하세요."
+SYSTEM_PROMPT = (
+    "당신은 친절한 한국어 챗봇입니다. 반드시 한국어로 답하세요. "
+    "이전 대화나 요약이 영어여도, 사용자가 다른 언어로 답해 달라고 직접 요청하지 않는 한 한국어로 답합니다. "
+    "사용자가 죽음이나 자해, 극심한 괴로움을 이야기하면 반드시 한국어로 공감하고 "
+    "자살예방상담전화 109를 안내하세요. 간결하고 정확하게 답하세요."
+)
 
 GROQ_API_KEY = GEMINI_API_KEY = GROQ_MODEL = GEMINI_MODEL = None
 groq_client = None
@@ -108,8 +115,10 @@ def ask_gemini(messages):
          "parts": [{"text": m["content"]}]}
         for m in messages if m["role"] != "system"
     ]
+    # 요약 등 추가 system 메시지도 빠지지 않게 모두 합쳐서 전달한다.
+    system_text = "\n\n".join(m["content"] for m in messages if m["role"] == "system") or SYSTEM_PROMPT
     body = {
-        "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
+        "system_instruction": {"parts": [{"text": system_text}]},
         "contents": contents,
     }
     res = requests.post(url, headers={"x-goog-api-key": GEMINI_API_KEY}, json=body, timeout=60)
@@ -184,7 +193,12 @@ def run_cli():
             continue
         if user.lower() in ("quit", "exit", "종료"):
             break
+        chat_history = [m for m in messages if m["role"] != "system"]
         messages.append({"role": "user", "content": user})
+        if is_crisis(user, chat_history):
+            messages.append({"role": "assistant", "content": CRISIS_REPLY})
+            print(f"\n봇(안내)> {CRISIS_REPLY}")
+            continue
         try:
             answer, provider = ask(messages)
         except Exception as e:

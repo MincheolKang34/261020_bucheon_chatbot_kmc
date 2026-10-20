@@ -5,6 +5,7 @@ import chatbot
 import memory
 import store
 from chatbot import ask
+from safety import CRISIS_REPLY, is_crisis
 
 app = Flask(__name__)
 
@@ -67,9 +68,14 @@ def chat():
     conv = store.get(cid)
     if conv is None:
         return jsonify(error="대화를 찾을 수 없습니다."), 404
+    user_msg = {"role": "user", "content": text}
+    if is_crisis(text, conv["messages"]):
+        # 모델을 거치지 않고 고정 안내를 보낸다. 기록에는 남겨 이후 대화가 이어지게 한다.
+        conv = store.append(cid, user_msg,
+                            {"role": "assistant", "content": CRISIS_REPLY, "provider": "안내"})
+        return jsonify(answer=CRISIS_REPLY, provider="안내", title=conv["title"])
     if not chatbot.has_keys():
         return jsonify(error="API 키가 설정되지 않았습니다.", need_setup=True), 400
-    user_msg = {"role": "user", "content": text}
     messages = memory.build_messages(cid, conv, user_msg)
     try:
         answer, provider = ask(messages)
