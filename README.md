@@ -17,8 +17,19 @@ Groq 호출이 실패하거나 할당량이 소진되면 Gemini API로 자동 �
    - Gemini: https://aistudio.google.com/apikey
 
 ## 설치
+### 1) 저장소 가져오기
+```bash
+git clone https://github.com/MincheolKang34/261020_bucheon_chatbot_kmc.git
+cd 261020_bucheon_chatbot_kmc
+```
+저장소 안에 같은 이름의 하위 폴더가 한 번 더 있고, 실제 코드는 그 안에 있습니다.
 ```bash
 cd 261020_bucheon_chatbot_kmc
+```
+(git이 없다면 GitHub 페이지의 `Code` → `Download ZIP` 으로 받아 압축을 풀어도 됩니다.)
+
+### 2) 라이브러리 설치
+```bash
 pip install -r requirements.txt
 ```
 
