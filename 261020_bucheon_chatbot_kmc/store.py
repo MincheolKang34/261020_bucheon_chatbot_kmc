@@ -72,3 +72,16 @@ def delete(cid):
         del data[cid]
         _save(data)
         return True
+
+
+def set_summary(cid, summary, summarized):
+    """요약문과, 그 요약에 반영된 메시지 수를 저장한다."""
+    with _lock:
+        data = _load()
+        conv = data.get(cid)
+        if conv is None:
+            return False
+        conv["summary"] = summary
+        conv["summarized"] = summarized
+        _save(data)
+        return True

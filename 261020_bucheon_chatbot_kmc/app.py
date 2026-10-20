@@ -2,8 +2,9 @@
 from flask import Flask, jsonify, render_template, request
 
 import chatbot
+import memory
 import store
-from chatbot import SYSTEM_PROMPT, ask
+from chatbot import ask
 
 app = Flask(__name__)
 
@@ -69,9 +70,7 @@ def chat():
     if not chatbot.has_keys():
         return jsonify(error="API 키가 설정되지 않았습니다.", need_setup=True), 400
     user_msg = {"role": "user", "content": text}
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}] + [
-        {"role": m["role"], "content": m["content"]} for m in conv["messages"]
-    ] + [user_msg]
+    messages = memory.build_messages(cid, conv, user_msg)
     try:
         answer, provider = ask(messages)
     except Exception as e:
