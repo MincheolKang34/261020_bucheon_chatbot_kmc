@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>부천 챗봇</title>
+<style>
+  :root { --bg:#f4f6fa; --card:#fff; --me:#4f6bed; --bot:#eceff5; --text:#1d2433; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#12151c; --card:#1b1f29; --me:#5b74f0; --bot:#2a3040; --text:#e8ebf2; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; height:100vh; background:var(--bg);
+         color:var(--text); font-family:system-ui,"Malgun Gothic",sans-serif; }
+  #app { height:100%; display:flex; max-width:1000px; margin:0 auto; background:var(--card); }
+  #side { width:250px; flex-shrink:0; border-right:1px solid var(--bot); display:flex; flex-direction:column; }
+  #side .top { padding:12px; }
+  #newchat { width:100%; border:0; background:var(--me); color:#fff; padding:10px;
+             border-radius:10px; cursor:pointer; font:inherit; }
+  #list { flex:1; overflow-y:auto; padding:0 8px 8px; }
+  .conv { display:flex; align-items:center; gap:4px; padding:9px 10px; border-radius:8px; cursor:pointer;
+          font-size:14px; }
+  .conv:hover { background:var(--bot); }
+  .conv.active { background:var(--bot); font-weight:600; }
+  .conv .t { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .conv .del { border:0; background:none; color:var(--text); opacity:0; cursor:pointer; font-size:15px; }
+  .conv:hover .del, .conv.active .del { opacity:.55; }
+  .conv .del:hover { opacity:1; color:#d64545; }
+  .empty { padding:14px; font-size:13px; opacity:.6; text-align:center; }
+  #main { flex:1; min-width:0; display:flex; flex-direction:column; }
+  #menu { display:none; }
+  @media (max-width:700px) {
+    #side { position:fixed; inset:0 30% 0 0; z-index:5; background:var(--card); transform:translateX(-100%);
+            transition:transform .2s; width:auto; }
+    #side.open { transform:none; box-shadow:0 0 30px rgba(0,0,0,.4); }
+    #menu { display:inline-block; }
+  }
+  header { padding:14px 16px; font-weight:600; border-bottom:1px solid var(--bot);
+           display:flex; justify-content:space-between; align-items:center; }
+  header button { border:0; background:var(--bot); color:var(--text); padding:6px 10px;
+                  border-radius:8px; cursor:pointer; }
+  #log { flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:10px; }
+  .msg { max-width:80%; padding:10px 14px; border-radius:14px; white-space:pre-wrap;
+         line-height:1.5; word-break:break-word; }
+  .me { align-self:flex-end; background:var(--me); color:#fff; border-bottom-right-radius:4px; }
+  .bot { align-self:flex-start; background:var(--bot); border-bottom-left-radius:4px; }
+  .tag { font-size:11px; opacity:.6; margin-bottom:2px; }
+  form { display:flex; gap:8px; padding:12px; border-top:1px solid var(--bot); }
+  textarea { flex:1; resize:none; padding:10px; border-radius:10px; border:1px solid var(--bot);
+             background:var(--bg); color:var(--text); font:inherit; max-height:120px; }
+  form button { border:0; background:var(--me); color:#fff; padding:0 18px; border-radius:10px;
+                cursor:pointer; font:inherit; }
+  form button:disabled { opacity:.5; cursor:default; }
+  header .btns { display:flex; gap:6px; }
+  dialog { border:0; border-radius:14px; padding:20px; width:min(420px,92vw);
+           background:var(--card); color:var(--text); }
+  dialog::backdrop { background:rgba(0,0,0,.45); }
+  dialog h2 { margin:0 0 4px; font-size:17px; }
+  dialog p { margin:0 0 12px; font-size:13px; opacity:.7; }
+  dialog label { display:block; font-size:13px; font-weight:600; margin-top:12px; }
+  .row { display:flex; gap:6px; margin-top:4px; }
+  .row input { flex:1; padding:9px; border-radius:8px; border:1px solid var(--bot);
+               background:var(--bg); color:var(--text); font:inherit; min-width:0; }
+  .row button, .actions button { border:0; border-radius:8px; padding:8px 12px; cursor:pointer;
+                                 background:var(--bot); color:var(--text); font:inherit; }
+  .actions { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
+  .actions .primary { background:var(--me); color:#fff; }
+  .hint { font-size:12px; margin-top:4px; min-height:16px; opacity:.8; }
+  .ok { color:#2e9e5b; opacity:1; } .bad { color:#d64545; opacity:1; } .warn { color:#c98a12; opacity:1; }
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="side">
+    <div class="top"><button id="newchat" type="button">＋ 새 대화</button></div>
+    <div id="list"></div>
+  </aside>
+  <div id="main">
+    <header>
+      <span><button id="menu" type="button">☰</button> 부천 챗봇</span>
+      <span class="btns">
+        <button id="settings" type="button">⚙ API 키</button>
+      </span>
+    </header>
+    <div id="log"></div>
+    <form id="form">
+      <textarea id="input" rows="1" placeholder="메시지를 입력하세요 (Enter 전송, Shift+Enter 줄바꿈)"></textarea>
+      <button id="send">전송</button>
+    </form>
+  </div>
+</div>
+<dialog id="dlg">
+  <h2>API 키 설정</h2>
+  <p>하나 이상 입력하세요. 저장 전에 키가 실제로 유효한지 확인합니다. 비워 두면 기존 값을 유지합니다.</p>
+  <label for="k-groq">Groq API 키</label>
+  <div class="row"><input id="k-groq" type="password" autocomplete="off" placeholder="gsk_..."><button type="button" data-eye="k-groq">보기</button></div>
+  <div class="hint" id="h-groq"></div>
+  <label for="k-gemini">Gemini API 키 <span style="font-weight:400;opacity:.7">(Groq 소진 시 대체)</span></label>
+  <div class="row"><input id="k-gemini" type="password" autocomplete="off" placeholder="AIza..."><button type="button" data-eye="k-gemini">보기</button></div>
+  <div class="hint" id="h-gemini"></div>
+  <div class="hint" id="h-all"></div>
+  <div class="actions">
+    <button type="button" id="dlg-close">닫기</button>
+    <button type="button" id="dlg-save" class="primary">확인 후 저장</button>
+  </div>
+</dialog>
+<script>
+const log = document.getElementById("log");
+const input = document.getElementById("input");
+const send = document.getElementById("send");
+const listEl = document.getElementById("list");
+const side = document.getElementById("side");
+const GREETING = "안녕하세요! 무엇을 도와드릴까요?";
+let currentId = null;   // null = 아직 저장되지 않은 새 대화
+
+const last = {
+  get() { try { return localStorage.getItem("lastConv"); } catch (e) { return null; } },
+  set(v) { try { v ? localStorage.setItem("lastConv", v) : localStorage.removeItem("lastConv"); } catch (e) {} },
+};
+
+async function api(path, opts) {
+  const res = await fetch(path, opts);
+  const data = await res.json();
+  if (!res.ok) { const err = new Error(data.error || res.status); err.data = data; throw err; }
+  return data;
+}
+
+function add(role, text, provider) {
+  const d = document.createElement("div");
+  d.className = "msg " + (role === "user" ? "me" : "bot");
+  if (provider) {
+    const t = document.createElement("div");
+    t.className = "tag";
+    t.textContent = provider;
+    d.appendChild(t);
+  }
+  d.appendChild(document.createTextNode(text));
+  log.appendChild(d);
+  log.scrollTop = log.scrollHeight;
+  return d;
+}
+
+function showConversation(messages) {
+  log.innerHTML = "";
+  add("assistant", GREETING);
+  messages.forEach((m) => add(m.role, m.content, m.role === "assistant" ? m.provider : null));
+}
+
+async function refreshList() {
+  const items = await api("/api/conversations");
+  listEl.innerHTML = "";
+  if (!items.length) {
+    const e = document.createElement("div");
+    e.className = "empty";
+    e.textContent = "저장된 대화가 없습니다.";
+    listEl.appendChild(e);
+    return items;
+  }
+  items.forEach((c) => {
+    const row = document.createElement("div");
+    row.className = "conv" + (c.id === currentId ? " active" : "");
+    const t = document.createElement("span");
+    t.className = "t";
+    t.textContent = c.title;
+    t.title = c.title;
+    const del = document.createElement("button");
+    del.className = "del";
+    del.textContent = "✕";
+    del.title = "삭제";
+    del.addEventListener("click", (ev) => { ev.stopPropagation(); removeConversation(c.id, c.title); });
+    row.append(t, del);
+    row.addEventListener("click", () => openConversation(c.id));
+    listEl.appendChild(row);
+  });
+  return items;
+}
+
+async function openConversation(id) {
+  try {
+    const conv = await api("/api/conversations/" + id);
+    currentId = id;
+    last.set(id);
+    showConversation(conv.messages);
+  } catch (e) {
+    currentId = null;
+    last.set(null);
+    showConversation([]);
+  }
+  side.classList.remove("open");
+  await refreshList();
+  input.focus();
+}
+
+function newConversation() {
+  currentId = null;       // 첫 메시지를 보낼 때 저장소에 만든다 (빈 대화가 쌓이지 않게)
+  last.set(null);
+  showConversation([]);
+  side.classList.remove("open");
+  refreshList();
+  input.focus();
+}
+
+async function removeConversation(id, title) {
+  if (!confirm("'" + title + "' 대화를 삭제할까요?")) return;
+  await api("/api/conversations/" + id, { method: "DELETE" });
+  if (id === currentId) newConversation(); else refreshList();
+}
+
+async function submit() {
+  const text = input.value.trim();
+  if (!text || send.disabled) return;
+  input.value = "";
+  send.disabled = true;
+  add("user", text);
+  const wait = add("assistant", "생각 중...");
+  try {
+    if (!currentId) {
+      currentId = (await api("/api/conversations", { method: "POST" })).id;
+      last.set(currentId);
+    }
+    const data = await api("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ conversation_id: currentId, message: text }),
+    });
+    wait.remove();
+    add("assistant", data.answer, data.provider);
+  } catch (e) {
+    wait.remove();
+    if (e.data && e.data.need_setup) openSettings();
+    add("assistant", "오류: " + e.message + " (이 메시지는 저장되지 않았습니다)");
+  } finally {
+    send.disabled = false;
+    input.focus();
+    refreshList();
+  }
+}
+
+document.getElementById("form").addEventListener("submit", (e) => { e.preventDefault(); submit(); });
+input.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); submit(); }
+});
+document.getElementById("newchat").addEventListener("click", newConversation);
+document.getElementById("menu").addEventListener("click", () => side.classList.toggle("open"));
+
+// 시작: 마지막으로 보던 대화(없으면 가장 최근 대화)를 이어서 연다
+(async () => {
+  const items = await refreshList();
+  const target = items.find((c) => c.id === last.get()) || items[0];
+  if (target) openConversation(target.id); else newConversation();
+})();
+
+// ---- API 키 설정 ----
+const dlg = document.getElementById("dlg");
+const MSG = {
+  ok: ["✅ 확인되어 저장되었습니다.", "ok"],
+  unverified: ["⚠️ 검증하지 못했지만(네트워크 등) 저장했습니다.", "warn"],
+  rejected: ["❌ 거부된 키입니다. 저장되지 않았습니다.", "bad"],
+};
+
+function showHint(id, text, cls) {
+  const h = document.getElementById(id);
+  h.textContent = text || "";
+  h.className = "hint " + (cls || "");
+}
+
+async function refreshStatus() {
+  const st = await (await fetch("/api/status")).json();
+  for (const p of ["groq", "gemini"]) {
+    document.getElementById("k-" + p).placeholder = st[p] ? "현재: " + st[p] : (p === "groq" ? "gsk_..." : "AIza...");
+  }
+  return st;
+}
+
+async function openSettings() {
+  ["groq", "gemini"].forEach((p) => { document.getElementById("k-" + p).value = ""; showHint("h-" + p); });
+  showHint("h-all");
+  await refreshStatus();
+  if (!dlg.open) dlg.showModal();
+}
+
+document.querySelectorAll("[data-eye]").forEach((b) => b.addEventListener("click", () => {
+  const i = document.getElementById(b.dataset.eye);
+  i.type = i.type === "password" ? "text" : "password";
+  b.textContent = i.type === "password" ? "보기" : "숨기기";
+}));
+
+document.getElementById("settings").addEventListener("click", openSettings);
+document.getElementById("dlg-close").addEventListener("click", () => dlg.close());
+
+document.getElementById("dlg-save").addEventListener("click", async () => {
+  const btn = document.getElementById("dlg-save");
+  const body = { groq: document.getElementById("k-groq").value.trim(),
+                 gemini: document.getElementById("k-gemini").value.trim() };
+  if (!body.groq && !body.gemini) { showHint("h-all", "키를 하나 이상 입력하세요.", "bad"); return; }
+  btn.disabled = true; btn.textContent = "확인 중...";
+  showHint("h-all");
+  try {
+    const res = await fetch("/api/setup", { method: "POST",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    for (const p of ["groq", "gemini"]) {
+      if (data.results[p]) showHint("h-" + p, MSG[data.results[p]][0], MSG[data.results[p]][1]);
+    }
+    await refreshStatus();
+    const accepted = Object.values(data.results).some((r) => r !== "rejected");
+    if (accepted) {
+      ["groq", "gemini"].forEach((p) => { if (data.results[p] !== "rejected") document.getElementById("k-" + p).value = ""; });
+      setTimeout(() => { if (dlg.open && data.configured) dlg.close(); }, 900);
+    }
+  } catch (e) {
+    showHint("h-all", "오류: " + e.message, "bad");
+  } finally {
+    btn.disabled = false; btn.textContent = "확인 후 저장";
+  }
+});
+
+// 첫 실행: 키가 하나도 없으면 설정 창을 자동으로 연다
+refreshStatus().then((st) => { if (!st.groq && !st.gemini) openSettings(); });
+</script>
+</body>
+</html>
